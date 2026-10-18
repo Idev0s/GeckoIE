@@ -13,12 +13,12 @@ The project is split into four stages. It is currently in stage 2.
  
 | Stage | State | What it means |
 |---|---|---|
-| 1. Window-hosted prototype | Done | A Mypal (74.1.4) engine runs as a hidden helper program and its window is docked over IE's page area. |
+| 1. Window hosted prototype | Done | A Mypal (74.1.4) engine runs as a hidden helper program and its window is docked over IE's page area. |
 | 2. Synced browser shell | In progress | IE's address bar, title, Back/Fwd, Refresh and history sync with the engine. Back/Fwd, multiple IE windows are still being tested. IE's Stop button is not connected yet. |
-| 3. Raw engine port | Research | Goal: run Gecko's engine inside IE itself, with no separate `firefox.exe`. So far a small custom loader can start Mypal's `xul.dll` without `firefox.exe` on XP. Running it inside IE's own process has not been tried yet. |
-| Final. Slimming | Planned | MSeverely decrease disk usage, lowering RAM usage and background processes. |
+| 3. Raw engine port | Research | The goal is to run Gecko's engine inside IE itself. Running it inside IE's own process has not been tried yet. |
+| Final. Optimizations | Planned | Severely decrease disk usage, lowering RAM usage and background processes. |
  
-"Mypal" here means an **unmodified** Mypal 74.1.4. GeckoIE adds a small overlay of configuration and script files to a copy of the Mypal folder. It does not change Mypal's program files.
+> Used Mypal 74.1.4. GeckoIE does not change Mypal's program files.
 
 ## Compatibility Info
 
@@ -36,23 +36,25 @@ Windows Vista and up with IE7+: Does **NOT** work at all right now.
  
 - Windows XP, 32-bit, with Internet Explorer 6.
 - **.NET Framework 2.0 or newer.** The installer builds the IE add-on on your PC with the .NET compiler.
-- Administrator rights.
-- A copy of Firefox that works on XP. GeckoIE does not include or redistribute Mypal. Mypal's source and project pages: <https://github.com/Feodor2/Mypal> and <https://github.com/Feodor2/Mypal68>. Check those pages for current downloads.
+- A copy of Firefox that works on XP. GeckoIE does not include Mypal. Mypal's source: <https://github.com/Feodor2/Mypal68>.
 
 ## How to install
 
 - Download a version of Firefox based browser that works on XP, recommend [Mypal](https://www.mypal-browser.org/download.html).
+- If your Mypal's program has another name, rename it to firefox.exe first.
 - Download the setup file from Releases. 
-- Setup will ask you
+- Run setup, it will ask you for:
   - Where to install the project
-  - Where you have your browser folder with firefox.exe (u r required to rename it to firefox.exe if not already)
-- Select if you want to slim the setup (move unused files to a backup "removed" location inside the installation folder).
+  - Where you have your browser folder with firefox.exe
+  - Slim the engine, selecting it, unused files will be moved to "engine-removed" and can be restored using 'restore-engine.bat'
+- Select if you want to slim the setup.
 - Run Internet Explorer 6 and expect bugs.
+> - You can still run legacy IE6 engine either through the Start menu shortcut or just by disabling the addon.
 
 ## Using it
  
 - Every IE window uses the engine (still new and being tested). Each IE window gets its own engine window inside one shared engine process.
-- For a plain IE window with no engine, start "Internet Explorer (classic)" from the GeckoIE folder in the Start menu.
+- For a plain IE window with no engine, start "Internet Explorer (classic)" from the GeckoIE folder in the Start menu, as said above.
 - Alt+Left and Alt+Right use IE's history.
 - Settings are in `ieb.ini` in the install folder: turn the engine off (`Enabled=0`), turn off starting it early (`Prewarm=0`), change its CPU priority (`Priority`), or put a soft cap on its memory (`MaxWorkingSetMB`). Changes apply the next time the engine starts.
 
@@ -72,9 +74,9 @@ Here are some early Alpha screenshots:
 - Keyboard shortcuts of IE (for example Ctrl+L) do not work while the engine area has focus.
 - Links that would open a new window open in the same tab.
 - Only `http` and `https` addresses go to the engine. Everything else uses IE's own rendering.
-- Downloads, printing and the Favorites bar are not integrated with the engine.
+- Downloads is not synced with IE, you can still download content though.
 - Only the first start of the day is slow: the engine is started with IE, and on a cold, slow disk that can take 30 seconds or more.
-- Each additional IE window uses extra memory.
+- Each additional IE window uses extra memory but not as launching a separate engine.
 
 
 ## Credits and legal
