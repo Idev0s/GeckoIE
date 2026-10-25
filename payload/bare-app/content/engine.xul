@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- GeckoIE bare engine window for engines older than Firefox 69 (XUL window). -->
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        id="geckoie-engine" title="GeckoIE bare engine" width="800" height="600">
+  <script type="application/javascript" src="chrome://geckoie/content/engine.js"/>
+  <browser id="content" type="content" primary="true" flex="1" src="about:blank"/>
+</window>

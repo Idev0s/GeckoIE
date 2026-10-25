@@ -1,0 +1,9 @@
+# GeckoIE: entries of the engine's omni.ja that are removed by "Slim the engine further".
+# One path prefix per line. The original omni.ja is kept in engine-removed (restore-engine.bat puts it back).
+chrome/devtools/
+modules/devtools/
+chrome/remote/
+chrome/pdfjs/
+chrome/en-US/locale/en-US/devtools/
+chrome/en-US/locale/en-US/pdfviewer/
+chrome/en-US/locale/en-US/remote/
