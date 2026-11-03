@@ -1,20 +1,23 @@
 
 # GeckoIE
 
-Hi! So GeckoIE is a project aiming to port Firefox's Gecko engine into Internet Explorer 6(+ down the line).
+Hi! So GeckoIE is an experimental project aiming to bring the Gecko web rendering engine to Internet Explorer 6 and then later versions of Internet Explorer down the line.
 
 > Alpha stage, so expect bugs.
 > 
 > **A Note on Maintenance:** 
-> This project is made for fan and is provided completely **as-is** :) I am not actively maintaining it. You can explore, copy, fix, fork and build "my" code.
+> GeckoIE is an independent, experimental project developed as a personal passion project. It is provided entirely as-is and is not actively maintained. You're welcome to explore, modify, fork and build upon the original GeckoIE code, subject to its license and applicable third-party licenses.
 
 ## How It Works
 
-Right now, the project is in a super early stage that basically just docks a toolbar-less Mypal (or whatever firefox related) window into an IE window. The goal is to get a full, raw Engine port, that will render natively inside IE Shell. 
+GeckoIE currently integrates a Gecko-based browser runtime into Internet Explorer through a native document-view integration.
 
-An IE addon starts the Gecko engine inside Internet Explorer's own process. IE shows a native document view, and the engine window is inside that view.
+A native Internet Explorer document object provides the browser's page area, while the Gecko engine is hosted within the Internet Explorer process. Its rendering surface is currently presented through a child window embedded inside the document view.
 
-It's still a Gecko window placed inside Internet Explorer's view, not the core engine port, but in a much better way than just docking a whole browser window (like Firefox) on IE.
+This is not yet a native Gecko rendering integration. The long-term goal is to eliminate the hosted rendering window entirely and have Gecko render directly within Internet Explorer's document surface.
+
+## Security note
+GeckoIE currently works with older Gecko builds like Mypal 74.1.4, rather than the latest release that no longer receives security updates, and it runs inside the IE process. Don’t use it for banking, passwords or other sensitive browsing.
 
 ## Status
  
@@ -27,7 +30,7 @@ The project is split into four stages. It is currently in stage 2.
 | 3. Raw engine port | Research | The goal is Gecko drawing directly inside IE with no child window at all. Not started yet. (it's gonna take a long time)|
 | Final. Optimizations | Planned | Severely decrease disk usage, lowering RAM usage and background processes. |
  
-> Used Mypal 74.1.4. GeckoIE does not change Mypal's program files.
+> Used Mypal 74.1.4.
 
 ## Compatibility Info
 
@@ -38,7 +41,7 @@ The project is split into four stages. It is currently in stage 2.
 |----------------|-------------------------------|-----------------------------|
 |Works (tested)|6           |XP            |
 |Experimental|7,8 (for XP)          |XP            |
-|Nightly (mostly not working)          |7+            |Vista and up            |
+|Unverified          |7+            |Vista and up            |
 
 ## Requirements
  
@@ -78,7 +81,7 @@ In order to compile or build the installer yourself, see [BUILD.md](BUILD.md).
 - The engine was slimmed too much: run restore-engine.bat from the install folder.
 
 ## AN IMPORTANT NOTE ON AI
-I want to be transparent: Most of this project was built using Claude AI, guided by me and my super clever instructions logic... (hehe) So that means that unexpected bugs WILL happen. If u trust AI, then you might be ok with this project, If not... well, fair enough :) I am not super active now but I will work on that.
+I want to be transparent: Most of this project was built using Claude AI, guided by me and my instructions logic. So that means that unexpected bugs WILL happen. If you trust AI, then you might be ok with this project, If not... well, fair enough :).
 
 ## Screenshots
 Here are some early Alpha screenshots:
@@ -99,7 +102,8 @@ Here are some early Alpha screenshots:
 
 ## Credits and legal
  
-- [Mypal](https://github.com/Feodor2/Mypal) by Feodor2, and Gecko by Mozilla, both under the Mozilla Public License 2.0.
+- [Mypal](https://github.com/Feodor2/Mypal68) by Feodor2, and Gecko by Mozilla, both under the Mozilla Public License 2.0.
 - NSIS (Nullsoft Scriptable Install System).
 - GeckoIE is an independent project. It is not affiliated with, endorsed by or sponsored by Microsoft or Mozilla. "Internet Explorer" and "Firefox" are trademarks of their owners.
 - GeckoIE's own wrapper code is licensed under the [MIT License](LICENSE).
+- See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md) for details.
