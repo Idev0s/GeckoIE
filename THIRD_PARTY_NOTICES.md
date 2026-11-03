@@ -1,32 +1,19 @@
-
 # Third-Party Notices
 
-GeckoIE is distributed under the MIT License for its original
-components, unless otherwise indicated.
+GeckoIE's original code is licensed under the MIT License (see LICENSE).
+It also relies on the third-party software below, which keeps its own license.
 
-GeckoIE incorporates or interacts with third-party software.
-Those components remain subject to their respective licenses.
+## Mypal / Gecko (Mozilla)
+- Source: https://github.com/Feodor2/Mypal68
+- License: Mozilla Public License 2.0 (https://www.mozilla.org/MPL/2.0/)
+- GeckoIE does not bundle Mypal. Users supply their own copy.
+  [If the installer copies, trims or modifies any Mypal files, state it here
+  and say those files remain MPL 2.0 with source available at the link above.]
 
-## Mozilla / Gecko
+## NSIS (Nullsoft Scriptable Install System)
+- Used to build the installer. License: zlib/libpng-style
+  (https://nsis.sourceforge.io/NSIS_License)
 
-Gecko-related components may be distributed under the
-Mozilla Public License 2.0 (MPL-2.0), or other applicable
-licenses.
-
-Copyright and licensing notices in third-party files
-must be preserved.
-
-## Mypal
-
-Mypal and its associated components retain their respective
-upstream licenses and copyright notices.
-
-## Other third-party components
-
-Additional dependencies, binaries and resources must retain
-their applicable licenses and notices.
-
-## GeckoIE
-
-Original GeckoIE source code is licensed under the MIT License.
-See LICENSE.
+## Microsoft
+- Internet Explorer, Windows and the .NET Framework are trademarks of
+  Microsoft. GeckoIE is not affiliated with Microsoft or Mozilla.
