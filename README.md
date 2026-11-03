@@ -1,13 +1,16 @@
+
 # GeckoIE
 
 Hi! So GeckoIE is a project aiming to port Firefox's Gecko engine into Internet Explorer 6(+ down the line).
 
 > Alpha stage, so expect bugs.
-
+> 
+> **A Note on Maintenance:** 
+> This project is made for fan and is provided completely **as-is** :) I am not actively maintaining it. You can explore, copy, fix, fork and build "my" code.
 
 ## How It Works
 
-Right now, the project is in a super early stage that basically just docks a toolbar-less Mypal (or whatever firefox related) window into an IE window. The goal is to get a full, raw Engine port, that will rendered natively inside IE Shell. 
+Right now, the project is in a super early stage that basically just docks a toolbar-less Mypal (or whatever firefox related) window into an IE window. The goal is to get a full, raw Engine port, that will render natively inside IE Shell. 
 
 An IE addon starts the Gecko engine inside Internet Explorer's own process. IE shows a native document view, and the engine window is inside that view.
 
@@ -67,11 +70,14 @@ The project is split into four stages. It is currently in stage 2.
 - **Downloads**: the engine downloads the file and Internet Explorer then opens it with its normal File Download window. The setting can be switched to a plain "Save As" window handled by GeckoIE.
 - **Settings** you do not change in the window live in ieb.ini in the install folder: turn the engine off (Enabled=0), turn off starting it early (Prewarm=0), change its CPU priority (Priority) or put a soft cap on its memory (MaxWorkingSetMB). Changes apply the next time the engine starts. The settings window saves your choices separately for each Windows user.
 
+## Building from Source
+In order to compile or build the installer yourself, see [BUILD.md](BUILD.md).
+
 ## Troubleshooting
 - IE shows ordinary pages and never the engine: check Enabled=1 in ieb.ini, and that the add-on is enabled in IE's Tools > Manage Add-ons.
 - The engine was slimmed too much: run restore-engine.bat from the install folder.
 
-# AN IMPORTANT NOTE ON AI
+## AN IMPORTANT NOTE ON AI
 I want to be transparent: Most of this project was built using Claude AI, guided by me and my super clever instructions logic... (hehe) So that means that unexpected bugs WILL happen. If u trust AI, then you might be ok with this project, If not... well, fair enough :) I am not super active now but I will work on that.
 
 ## Screenshots
@@ -96,4 +102,4 @@ Here are some early Alpha screenshots:
 - [Mypal](https://github.com/Feodor2/Mypal) by Feodor2, and Gecko by Mozilla, both under the Mozilla Public License 2.0.
 - NSIS (Nullsoft Scriptable Install System).
 - GeckoIE is an independent project. It is not affiliated with, endorsed by or sponsored by Microsoft or Mozilla. "Internet Explorer" and "Firefox" are trademarks of their owners.
-- License for GeckoIE's own code: *choose one before publishing (for example MIT or MPL-2.0).*
+- GeckoIE's own wrapper code is licensed under the [MIT License](LICENSE).
