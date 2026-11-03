@@ -7,6 +7,8 @@
 "use strict";
 
 (function () {
+  try { document.title = "GeckoIE bare engine"; } catch (e) {}   // known to the host before the window is ever shown
+  try { window.moveTo(-32000, -32000); } catch (e) {}   // never visible: the host docks this window into Internet Explorer
   const Cc = Components.classes, Ci = Components.interfaces, Cu = Components.utils;
 
   function logPath() {
@@ -18,11 +20,14 @@
     } catch (e) { return null; }
   }
 
+  let logN = 0;
   function log(msg) {
     dump("[geckoie] " + msg + "\n");
+    if (/^title: /.test(msg)) return;   // pages change their title all the time: not worth a disk write each
     try {
       const f = logPath();
       if (!f) return;
+      if ((++logN % 50) === 1 && f.exists() && f.fileSize > 300000) f.remove(false);
       const s = Cc["@mozilla.org/network/file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
       s.init(f, 0x02 | 0x08 | 0x10, 438, 0); // write | create | append
       const line = "[bare] " + msg + "\r\n";
@@ -71,8 +76,26 @@
   // The bridge was written for Firefox's tabbed browser window (gBrowser). This gives it the same
   // surface on top of our single content area.
   function makeGBrowserShim(browser) {
-    const tab = {};
+    // DevTools' TargetFactory.forTab() expects a real tab: it reads tab.linkedBrowser (plus its owner window/document).
+    const tab = {
+      get linkedBrowser() { return browser; },
+      get ownerGlobal() { return window; },
+      get ownerDocument() { return document; },
+      get selected() { return true; },
+      get label() { try { return browser.contentTitle; } catch (e) { return ""; } },
+      get pinned() { return false; },
+      getAttribute() { return null; },
+      hasAttribute() { return false; },
+      addEventListener() {}, removeEventListener() {}
+    };
     return {
+      get tabs() { return [tab]; },
+      get browsers() { return [browser]; },
+      get visibleTabs() { return [tab]; },
+      get ownerGlobal() { return window; },
+      get ownerDocument() { return document; },
+      getBrowserForTab() { return browser; },
+      getTabForBrowser() { return tab; },
       get currentURI() { return browser.currentURI; },
       get selectedBrowser() { return browser; },
       get selectedTab() { return tab; },
@@ -83,7 +106,9 @@
       stop() { browser.stop(); },
       reload() { browser.reload(); },
       loadURI(url, params) { browser.loadURI(url, params); },
-      addProgressListener(l) { browser.webProgress.addProgressListener(l, Ci.nsIWebProgress.NOTIFY_ALL); },
+      addProgressListener(l) {   // only page-level load state, location and status text: not every request, progress tick and security change
+        const W = Ci.nsIWebProgress; browser.webProgress.addProgressListener(l, W.NOTIFY_STATE_NETWORK | W.NOTIFY_LOCATION | W.NOTIFY_STATUS);
+      },
       tabContainer: {
         addEventListener(type, fn) {
           if (type === "TabAttrModified")
@@ -109,7 +134,7 @@
         onLocationChange(wp, req, loc) { if (loc) log("location: " + loc.spec); },
         onProgressChange() {}, onStatusChange() {}, onSecurityChange() {}, onContentBlockingEvent() {}
       };
-      browser.webProgress.addProgressListener(listener, Ci.nsIWebProgress.NOTIFY_ALL);
+      browser.webProgress.addProgressListener(listener, Ci.nsIWebProgress.NOTIFY_STATE_NETWORK | Ci.nsIWebProgress.NOTIFY_LOCATION);
       log("progress listener attached");
     } catch (e) { log("progress listener failed: " + e); }
 
@@ -125,7 +150,13 @@
     // Links that want a new window load in this content area instead.
     window.browserDOMWindow = {
       QueryInterface: ChromeUtils.generateQI([Ci.nsIBrowserDOMWindow]),
-      createContentWindow() { log("new window requested, reusing this one"); return browser.contentWindow; },
+      // window.open(): giving the page this very window made scripts overwrite the page the user is on.
+      // An address becomes a new Internet Explorer window; the page gets null, exactly like a blocked pop-up.
+      createContentWindow(uri) {
+        log("window.open for " + (uri && uri.spec));
+        try { if (uri && /^https?:/i.test(uri.spec)) ChromeUtils.import("chrome://geckoie/content/bridge.jsm").IEBridge.openInNewWindow(window, uri.spec); } catch (e) { log("new IE window failed: " + e); }
+        return null;
+      },
       openURI(uri, opener, where) {
         log("new window for " + (uri && uri.spec));
         if (!uri) return null;

@@ -3,18 +3,18 @@ Unicode false
 SetCompressor /SOLID lzma
 RequestExecutionLevel admin
 !define APP_NAME "GeckoIE"
-!define APP_VERSION "v0 build 261024.3"
+!define APP_VERSION "v0.1 Alpha 3"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\GeckoIE"
 !define OLD_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\IEBridge"
 !define BHO_CLSID "{FC8F2A4B-3C6E-4B53-9D0F-6A1C2E7B5D31}"
 !define BHO_KEY "Software\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects\${BHO_CLSID}"
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "GeckoIE-v0-build-261024.3-Setup.exe"
-VIProductVersion "0.0.261024.3"
+OutFile "GeckoIE-v0.1-Alpha3-Setup.exe"
+VIProductVersion "0.1.0.2"
 VIAddVersionKey "ProductName" "GeckoIE"
 VIAddVersionKey "FileDescription" "GeckoIE setup"
-VIAddVersionKey "FileVersion" "v0 build 261024.3"
-VIAddVersionKey "ProductVersion" "v0 build 261024.3"
+VIAddVersionKey "FileVersion" "v0.1 Alpha 3 (build 261101.2)"
+VIAddVersionKey "ProductVersion" "v0.1 Alpha 3 (build 261101.2)"
 InstallDir "$PROGRAMFILES\GeckoIE"
 InstallDirRegKey HKLM "Software\GeckoIE" "InstallDir"
 ShowInstDetails show
@@ -24,6 +24,10 @@ ShowUninstDetails show
 !include "LogicLib.nsh"
 !include "Sections.nsh"
 !include "WinVer.nsh"
+!include "FileFunc.nsh"
+!insertmacro GetSize
+!insertmacro DriveSpace
+!insertmacro GetRoot
 Var MypalDir
 Var MypalEdit
 Var Token
@@ -37,7 +41,7 @@ Var EngMajor
 !define MUI_ICON "payload\GeckoIE.ico"
 !define MUI_UNICON "payload\GeckoIE.ico"
 !define MUI_ABORTWARNING
-!define MUI_WELCOMEPAGE_TEXT "This sets up a modern web engine (Mypal/Gecko) inside Internet Explorer.$\r$\n$\r$\nhttp and https pages open in a native Internet Explorer view: IE's address bar, Back/Forward, history, title and toolbar all stay in sync.$\r$\n$\r$\nOlder GeckoIE / IEBridge installations are detected and replaced. Please close all Internet Explorer windows first."
+!define MUI_WELCOMEPAGE_TEXT "GeckoIE v0.1 Alpha 3.$\r$\n$\r$\nThis sets up a modern web engine (Mypal/Gecko) inside Internet Explorer.$\r$\n$\r$\nhttp and https pages open in a native Internet Explorer view: IE's address bar, Back/Forward, history, title and toolbar all stay in sync.$\r$\n$\r$\nOlder GeckoIE / IEBridge installations are detected and replaced. Please close all Internet Explorer windows first."
 !define MUI_FINISHPAGE_TEXT "GeckoIE is installed.$\r$\n$\r$\nOpen Internet Explorer and go to any http or https address. Right-click works in pages. An optional toolbar button, GeckoIE Settings, is off by default: View > Toolbars > Customize adds it.$\r$\n$\r$\nFor a plain Internet Explorer window use Start Menu > GeckoIE > Internet Explorer (classic)."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_COMPONENTS
@@ -100,8 +104,9 @@ Page custom MypalPageCreate MypalPageLeave
   ${EndIf}
 !macroend
 !macro SetIni KEY VAL
-  nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\set-ini.bat" "$INSTDIR\ieb.ini" ${KEY} ${VAL}"'
-  Pop $0
+  StrCpy $R0 "${KEY}"
+  StrCpy $R1 "${VAL}"
+  Call SetIniRaw
 !macroend
 
 ; $R0 = key, $R1 = value written exactly as given (may contain %VARIABLES%)
@@ -234,16 +239,49 @@ Function MypalPageLeave
     MessageBox MB_OK|MB_ICONEXCLAMATION "xul.dll was not found in that folder."
     Abort
   ${EndIf}
+  ${If} "$MypalDir" != "$INSTDIR\engine"
+    ${GetSize} "$MypalDir" "/S=0K" $0 $1 $2
+    ${GetRoot} "$INSTDIR" $3
+    ${DriveSpace} "$3\" "/D=F /S=K" $4
+    IntOp $5 $0 / 4
+    IntOp $5 $5 + $0
+    IntOp $5 $5 + 40960
+    ${If} $4 < $5
+      IntOp $6 $5 / 1024
+      IntOp $7 $4 / 1024
+      MessageBox MB_YESNO|MB_ICONEXCLAMATION "There may not be enough free disk space on the drive you chose: about $6 MB are needed, $7 MB are free.$\r$\n$\r$\nContinue anyway?" IDYES diskOk
+      Abort
+      diskOk:
+    ${EndIf}
+  ${EndIf}
 FunctionEnd
 
 ; ------------------------------------------------------------------ install
 Section "Engine, Internet Explorer add-on and native view (required)" SecMain
   SectionIn RO
   ieCheck:
+  StrCpy $R9 0
   FindWindow $0 "IEFrame"
   ${If} $0 != 0
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Please close all Internet Explorer windows, then click Retry." IDRETRY ieCheck
+    StrCpy $R9 1
+  ${EndIf}
+  ${If} $R9 == 0   ; an Internet Explorer process without a window (background, or still shutting down) keeps the add-on files in use too
+    nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$SYSDIR\tasklist.exe" /FI "IMAGENAME eq iexplore.exe" /NH | "$SYSDIR\find.exe" /I "iexplore.exe" >nul"'
+    Pop $0
+    ${If} $0 == 0
+      StrCpy $R9 1
+    ${EndIf}
+  ${EndIf}
+  ${If} $R9 == 1
+    MessageBox MB_ABORTRETRYIGNORE|MB_ICONEXCLAMATION "Internet Explorer is still running (possibly in the background).$\r$\n$\r$\nClose all Internet Explorer windows, then click Retry.$\r$\nIgnore closes Internet Explorer for you (unsaved work in it is lost).$\r$\nAbort cancels the installation." /SD IDABORT IDRETRY ieCheck IDIGNORE ieKill
     Abort "Installation cancelled."
+    ieKill:
+    nsExec::Exec '"$SYSDIR\taskkill.exe" /F /IM iexplore.exe'
+    Pop $0
+    nsExec::Exec '"$SYSDIR\tskill.exe" iexplore'
+    Pop $0
+    Sleep 1500
+    Goto ieCheck
   ${EndIf}
 
   DetailPrint "Looking for older GeckoIE / IEBridge installations..."
@@ -269,8 +307,7 @@ Section "Engine, Internet Explorer add-on and native view (required)" SecMain
   SetOutPath "$INSTDIR"
   CreateDirectory "$INSTDIR\engine"
   ${If} "$MypalDir" != "$INSTDIR\engine"
-    DetailPrint "Copying the Mypal engine (this can take a minute)..."
-    CopyFiles /SILENT "$MypalDir\*.*" "$INSTDIR\engine"
+    Call CopyEngine
   ${EndIf}
   ${IfNot} ${FileExists} "$INSTDIR\engine\xul.dll"
     MessageBox MB_OK|MB_ICONSTOP "The engine files could not be copied."
@@ -317,10 +354,7 @@ Section "Engine, Internet Explorer add-on and native view (required)" SecMain
     DetailPrint "  older engine: using the XUL window variant"
     CopyFiles /SILENT "$INSTDIR\bare-app-extra\prefs-xul.js" "$INSTDIR\bare-app\defaults\preferences\prefs.js"
   ${EndIf}
-  SetOutPath "$INSTDIR\bho-src"
-  File "payload\bho-src\*.cs"
-  File "payload\bho-src\install-bho.bat"
-  File "payload\bho-src\uninstall-bho.bat"
+  RMDir /r "$INSTDIR\bho-src"   ; the add-on is native code now: no source to build on this computer
   SetOutPath "$INSTDIR"
   File "payload\restore-engine.bat"
   File "payload\shell.html"
@@ -338,16 +372,11 @@ Section "Engine, Internet Explorer add-on and native view (required)" SecMain
   StrCpy $Token "$3$4"
   ${If} ${FileExists} "$INSTDIR\ieb.ini"
     DetailPrint "Keeping your settings (ieb.ini), switching it to the native view..."
-    nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\set-ini.bat" "$INSTDIR\ieb.ini" EngineDir engine"'
-    Pop $0
-    nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\set-ini.bat" "$INSTDIR\ieb.ini" EngineExe ieengine.exe"'
-    Pop $0
-    nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\set-ini.bat" "$INSTDIR\ieb.ini" EngineMode inproc"'
-    Pop $0
-    nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\set-ini.bat" "$INSTDIR\ieb.ini" HostMode docobj"'
-    Pop $0
-    nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\set-ini.bat" "$INSTDIR\ieb.ini" Enabled 1"'
-    Pop $0
+    !insertmacro SetIni "EngineDir" "engine"
+    !insertmacro SetIni "EngineExe" "ieengine.exe"
+    !insertmacro SetIni "EngineMode" "inproc"
+    !insertmacro SetIni "HostMode" "docobj"
+    !insertmacro SetIni "Enabled" "1"
     Goto settingsDone
   ${EndIf}
   DetailPrint "Writing settings..."
@@ -374,6 +403,9 @@ Section "Engine, Internet Explorer add-on and native view (required)" SecMain
   settingsDone:
 
   WriteRegStr HKLM "Software\GeckoIE" "InstallDir" "$INSTDIR"
+  ${If} "$MypalDir" != "$INSTDIR\engine"
+    WriteRegStr HKLM "Software\GeckoIE" "MypalSource" "$MypalDir"
+  ${EndIf}
   WriteUninstaller "$INSTDIR\uninstall.exe"
   CreateDirectory "$SMPROGRAMS\GeckoIE"
   CreateShortCut "$SMPROGRAMS\GeckoIE\Internet Explorer (classic).lnk" "$INSTDIR\classic-ie.cmd" "" "$PROGRAMFILES\Internet Explorer\iexplore.exe" 0 SW_SHOWMINIMIZED
@@ -386,13 +418,8 @@ Section "Engine, Internet Explorer add-on and native view (required)" SecMain
   WriteRegDWORD HKLM "${UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${UNINST_KEY}" "NoRepair" 1
 
-  DetailPrint "Building and registering the Internet Explorer add-on..."
-  nsExec::ExecToLog '"$SYSDIR\cmd.exe" /c ""$INSTDIR\bho-src\install-bho.bat" "$INSTDIR""'
-  Pop $0
-  ${If} $0 != 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "The Internet Explorer add-on could not be installed (error $0). The installer window shows the details."
-  ${EndIf}
   SetOutPath "$INSTDIR\bho"
+  Delete "$INSTDIR\bho\IEBridgeBho.dll"   ; the older .NET add-on
   File "payload\GeckoHost.dll"
   File "payload\GeckoIEDoc.dll"
   File "payload\GeckoIE.ico"
@@ -400,7 +427,7 @@ Section "Engine, Internet Explorer add-on and native view (required)" SecMain
   nsExec::ExecToLog '"$SYSDIR\regsvr32.exe" /s "$INSTDIR\bho\GeckoIEDoc.dll"'
   Pop $0
   ${If} $0 != 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "The native view could not be registered (regsvr32 error $0). GeckoIE will fall back to the older docked mode."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "The native view could not be registered (regsvr32 error $0). Internet Explorer will keep using its own rendering until GeckoIEDoc.dll is registered (run: regsvr32 $\"$INSTDIR\bho\GeckoIEDoc.dll$\")."
   ${EndIf}
 
   ; older installations: ask before deleting their folders
@@ -436,8 +463,14 @@ SectionGroup "Optional components"
 SectionGroupEnd
 
 SectionGroup "Slimming"
+  Section /o "Keep a backup of removed engine files (restore-engine.bat; uses extra disk space)" SecKeep
+    DetailPrint "Backups of removed files will be kept"
+  SectionEnd
   Section /o "Remove files GeckoIE never uses (updater, crash reporter, Firefox browser UI folder)" SecSlim
     DetailPrint "Basic slimming selected"
+  SectionEnd
+  Section /o "Extended slimming: also remove Sync, Firefox Account, telemetry start-up, add-on manager and update screens (faster start)" SecSlimX
+    DetailPrint "Extended slimming selected"
   SectionEnd
 SectionGroupEnd
 
@@ -453,6 +486,13 @@ Section "-Finalize" SecFinal
   ${Else}
     !insertmacro RestoreFile "mozavcodec.dll"
     !insertmacro RestoreFile "mozavutil.dll"
+  ${EndIf}
+  SectionGetFlags ${SecSlimX} $1
+  IntOp $1 $1 & ${SF_SELECTED}
+  ${If} $1 != 0
+    !insertmacro MoveOutDir "hyphenation"
+  ${Else}
+    !insertmacro RestoreDir "hyphenation"
   ${EndIf}
   SectionGetFlags ${SecDict} $1
   IntOp $1 $1 & ${SF_SELECTED}
@@ -477,6 +517,12 @@ Section "-Finalize" SecFinal
     StrCpy $R2 1
     FileWrite $0 "chrome/pdfjs/$\r$\nchrome/en-US/locale/en-US/pdfviewer/$\r$\n"
   ${EndIf}
+  SectionGetFlags ${SecSlimX} $1
+  IntOp $1 $1 & ${SF_SELECTED}
+  ${If} $1 != 0   ; extended slimming: parts of the Firefox browser that a page view never starts, so the engine has less to read and register at start-up
+    StrCpy $R2 1
+    FileWrite $0 "components/TelemetryStartup$\r$\ncomponents/Weave$\r$\ncomponents/SyncComponents$\r$\ncomponents/FxAccounts$\r$\nmodules/services-sync/$\r$\nmodules/FxAccounts$\r$\nchrome/toolkit/content/mozapps/extensions/$\r$\nchrome/toolkit/content/mozapps/update/$\r$\n"
+  ${EndIf}
   FileClose $0
   StrCpy $R1 "$INSTDIR\engine\omni.ja"
   ${If} ${FileExists} "$INSTDIR\engine-removed\omni.ja"
@@ -494,8 +540,6 @@ Section "-Finalize" SecFinal
           Delete "$INSTDIR\engine\omni.ja"
         ${EndIf}
         Rename "$INSTDIR\engine\omni.ja.slim" "$INSTDIR\engine\omni.ja"
-        nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\purge-cache.bat""'
-        Pop $0
         DetailPrint "  done (restore-engine.bat puts the original back)"
       ${ElseIf} $0 == 2
         DetailPrint "  nothing to remove from this engine"
@@ -509,10 +553,68 @@ Section "-Finalize" SecFinal
   ${Else}
     ${If} ${FileExists} "$INSTDIR\engine-removed\omni.ja"
       CopyFiles /SILENT "$INSTDIR\engine-removed\omni.ja" "$INSTDIR\engine\omni.ja"
-      nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$INSTDIR\purge-cache.bat""'
-      Pop $0
       DetailPrint "Original omni.ja restored (everything was chosen)"
     ${EndIf}
+  ${EndIf}
+  ; ---- developer tools live in browser\omni.ja (Firefox's own app part), not in the engine core
+  SectionGetFlags ${SecDev} $1
+  IntOp $1 $1 & ${SF_SELECTED}
+  ${If} $1 != 0
+    !insertmacro RestoreDir "browser"
+  ${EndIf}
+  StrCpy $R3 "$INSTDIR\engine\browser\omni.ja"
+  ${If} ${FileExists} "$R3"
+    ${IfNot} ${FileExists} "$INSTDIR\engine-removed\browser-omni.ja.orig"
+      CopyFiles /SILENT "$R3" "$INSTDIR\engine-removed\browser-omni.ja.orig"
+    ${EndIf}
+    ${If} $1 == 0
+      DetailPrint "Removing the developer tools from browser\omni.ja..."
+      FileOpen $0 "$INSTDIR\omni-remove-browser.txt" w
+      FileWrite $0 "chrome/devtools/$\r$\nmodules/devtools/$\r$\n"
+      FileClose $0
+      nsExec::ExecToLog '"$INSTDIR\omnislim.exe" "$INSTDIR\engine-removed\browser-omni.ja.orig" "$INSTDIR\engine\browser\omni.ja.slim" "$INSTDIR\omni-remove-browser.txt"'
+      Pop $0
+      ${If} $0 == 0
+        Delete "$R3"
+        Rename "$INSTDIR\engine\browser\omni.ja.slim" "$R3"
+      ${Else}
+        Delete "$INSTDIR\engine\browser\omni.ja.slim"
+      ${EndIf}
+    ${Else}
+      CopyFiles /SILENT "$INSTDIR\engine-removed\browser-omni.ja.orig" "$R3"
+    ${EndIf}
+  ${EndIf}
+  ; does this engine contain developer tools at all? (look at the untouched copies; only needed when they were asked for)
+  StrCpy $R4 0
+  SectionGetFlags ${SecDev} $1
+  IntOp $1 $1 & ${SF_SELECTED}
+  ${If} $1 != 0
+  StrCpy $R5 "$INSTDIR\engine-removed\browser-omni.ja.orig"
+  ${IfNot} ${FileExists} "$R5"
+    StrCpy $R5 "$INSTDIR\engine\browser\omni.ja"
+  ${EndIf}
+  ${IfNot} ${FileExists} "$R5"
+    StrCpy $R5 "$INSTDIR\engine-removed\browser\omni.ja"
+  ${EndIf}
+  ${If} ${FileExists} "$R5"
+    nsExec::Exec '"$INSTDIR\omnislim.exe" --has "$R5" chrome/devtools/'
+    Pop $0
+    ${If} $0 == 0
+      StrCpy $R4 1
+    ${EndIf}
+    nsExec::Exec '"$INSTDIR\omnislim.exe" --has "$R5" modules/devtools/'
+    Pop $0
+    ${If} $0 == 0
+      StrCpy $R4 1
+    ${EndIf}
+  ${EndIf}
+  ${If} ${FileExists} "$R1"
+    nsExec::Exec '"$INSTDIR\omnislim.exe" --has "$R1" chrome/devtools/'
+    Pop $0
+    ${If} $0 == 0
+      StrCpy $R4 1
+    ${EndIf}
+  ${EndIf}
   ${EndIf}
   ; ---- basic slimming
   SectionGetFlags ${SecSlim} $1
@@ -531,7 +633,13 @@ Section "-Finalize" SecFinal
     !insertmacro MoveOut "minidump-analyzer.exe"
     !insertmacro MoveOut "precomplete"
     !insertmacro MoveOut "removed-files"
-    !insertmacro MoveOutDir "browser"
+    SectionGetFlags ${SecDev} $2
+    IntOp $2 $2 & ${SF_SELECTED}
+    ${If} $2 == 0
+      !insertmacro MoveOutDir "browser"
+    ${Else}
+      DetailPrint "  keeping the browser folder: the developer tools live there"
+    ${EndIf}
     !insertmacro MoveOutDir "gmp-clearkey"
     !insertmacro MoveOutDir "uninstall"
   ${EndIf}
@@ -545,6 +653,14 @@ Section "-Finalize" SecFinal
   ; ---- settings the engine and the add-on read
   SectionGetFlags ${SecDev} $1
   IntOp $1 $1 & ${SF_SELECTED}
+  ${If} $1 != 0
+  ${AndIf} $R4 == 0
+    DetailPrint "This engine does not contain the Firefox developer tools, so Inspect Element is not offered."
+    IfSilent devNone
+    MessageBox MB_OK|MB_ICONINFORMATION "The engine you installed does not contain the Firefox developer tools, so Inspect Element will not be offered."
+    devNone:
+    StrCpy $1 0
+  ${EndIf}
   ${If} $1 == 0
     !insertmacro SetIni "DevTools" "0"
   ${Else}
@@ -582,7 +698,117 @@ Section "-Finalize" SecFinal
   ${If} $EngMajor != 74
     DetailPrint "  not Mypal 74: the engine is started in experimental mode (see gh-log.txt if it does not start)"
   ${EndIf}
+  ; ---- backups only when asked for (run setup again with your Mypal folder to bring anything back)
+  SectionGetFlags ${SecKeep} $1
+  IntOp $1 $1 & ${SF_SELECTED}
+  ${If} $1 == 0
+    RMDir /r "$INSTDIR\engine-removed"
+  ${EndIf}
 SectionEnd
+
+Function CopyEngine   ; after the components, because it reads which of them were chosen
+    DetailPrint "Copying the Mypal engine (files that did not change are skipped)..."
+    RMDir /r "$INSTDIR\engine-removed"
+    ; files that the chosen components move away again anyway are not copied (unless a backup was asked for)
+    FileOpen $0 "$INSTDIR\xcopy-exclude.txt" w
+    FileWrite $0 "\omni.ja.slim$\r$\n"
+    SectionGetFlags ${SecKeep} $1
+    IntOp $1 $1 & ${SF_SELECTED}
+    ${If} $1 == 0
+      SectionGetFlags ${SecMedia} $2
+      IntOp $2 $2 & ${SF_SELECTED}
+      ${If} $2 == 0
+        FileWrite $0 "\mozavcodec.dll$\r$\n\mozavutil.dll$\r$\n"
+      ${EndIf}
+      SectionGetFlags ${SecDict} $2
+      IntOp $2 $2 & ${SF_SELECTED}
+      ${If} $2 == 0
+        FileWrite $0 "\dictionaries\$\r$\n"
+      ${EndIf}
+      SectionGetFlags ${SecSlimX} $2
+      IntOp $2 $2 & ${SF_SELECTED}
+      ${If} $2 != 0
+        FileWrite $0 "\hyphenation\$\r$\n"
+      ${EndIf}
+      SectionGetFlags ${SecSlim} $2
+      IntOp $2 $2 & ${SF_SELECTED}
+      ${If} $2 != 0
+        FileWrite $0 "\crashreporter.exe$\r$\n\crashreporter.ini$\r$\n\crashreporter-override.ini$\r$\n\maintenanceservice.exe$\r$\n\maintenanceservice_installer.exe$\r$\n\updater.exe$\r$\n\updater.ini$\r$\n\update-settings.ini$\r$\n\pingsender.exe$\r$\n\minidump-analyzer.exe$\r$\n\precomplete$\r$\n\removed-files$\r$\n\gmp-clearkey\$\r$\n\uninstall\$\r$\n"
+        SectionGetFlags ${SecDev} $2
+        IntOp $2 $2 & ${SF_SELECTED}
+        ${If} $2 == 0
+          FileWrite $0 "\browser\$\r$\n"
+        ${EndIf}
+      ${EndIf}
+    ${EndIf}
+    FileClose $0
+    SetOutPath "$INSTDIR"
+    nsExec::ExecToLog '"$SYSDIR\xcopy.exe" "$MypalDir\*.*" "$INSTDIR\engine" /E /I /Y /Q /D /R /EXCLUDE:xcopy-exclude.txt'   ; relative path: the current folder is $INSTDIR, and xcopy cannot take a path with spaces here
+    Pop $0
+    ${If} $0 != 0
+    ${AndIf} $0 != 1
+      DetailPrint "  quick copy did not work (code $0): copying everything"
+      CopyFiles /SILENT "$MypalDir\*.*" "$INSTDIR\engine"
+    ${EndIf}
+    ; the files that repacking changes are always taken fresh from the source
+    ${If} ${FileExists} "$MypalDir\omni.ja"
+      CopyFiles /SILENT "$MypalDir\omni.ja" "$INSTDIR\engine\omni.ja"
+    ${EndIf}
+    ${If} ${FileExists} "$MypalDir\browser\omni.ja"
+    ${AndIf} ${FileExists} "$INSTDIR\engine\browser\*.*"
+      CopyFiles /SILENT "$MypalDir\browser\omni.ja" "$INSTDIR\engine\browser\omni.ja"
+    ${EndIf}
+    Delete "$INSTDIR\xcopy-exclude.txt"
+FunctionEnd
+
+!ifndef LVM_GETITEMCOUNT
+  !define LVM_GETITEMCOUNT 0x1004
+!endif
+!ifndef LVM_GETITEMTEXT
+  !define LVM_GETITEMTEXT 0x102D
+!endif
+Function DumpLog
+  Exch $5
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  Push $4
+  Push $6
+  FindWindow $0 "#32770" "" $HWNDPARENT
+  GetDlgItem $0 $0 1016
+  StrCmp $0 0 dumpExit
+  FileOpen $5 $5 "w"
+  StrCmp $5 "" dumpExit
+    SendMessage $0 ${LVM_GETITEMCOUNT} 0 0 $6
+    System::Alloc ${NSIS_MAX_STRLEN}
+    Pop $3
+    StrCpy $2 0
+    System::Call "*(i, i, i, i, i, i, i, i, i) i (0, 0, 0, 0, 0, r3, ${NSIS_MAX_STRLEN}) .r1"
+    dumpLoop: StrCmp $2 $6 dumpDone
+      System::Call "User32::SendMessageA(i, i, i, i) i ($0, ${LVM_GETITEMTEXT}, $2, r1)"
+      System::Call "*$3(&t${NSIS_MAX_STRLEN} .r4)"
+      FileWrite $5 "$4$\r$\n"
+      IntOp $2 $2 + 1
+      Goto dumpLoop
+    dumpDone:
+      FileClose $5
+      System::Free $1
+      System::Free $3
+  dumpExit:
+  Pop $6
+  Pop $4
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+  Pop $5
+FunctionEnd
+
+Function .onInstSuccess
+  Push "$INSTDIR\setup-log.txt"
+  Call DumpLog
+FunctionEnd
 
 Function .onInit
   StrCpy $MypalDir ""
@@ -604,8 +830,12 @@ Function .onInit
   Call AddOld
   StrCpy $0 "C:\iebridge"
   Call AddOld
-  ; where to take the engine from
-  ${If} ${FileExists} "$INSTDIR\engine\xul.dll"
+  ; where to take the engine from: the folder used last time (a fresh copy each time keeps components switchable), else the installed one
+  ReadRegStr $0 HKLM "Software\GeckoIE" "MypalSource"
+  ${If} $0 != ""
+  ${AndIf} ${FileExists} "$0\xul.dll"
+    StrCpy $MypalDir $0
+  ${ElseIf} ${FileExists} "$INSTDIR\engine\xul.dll"
     StrCpy $MypalDir "$INSTDIR\engine"
   ${ElseIf} ${FileExists} "$OD1\engine\xul.dll"
     StrCpy $MypalDir "$OD1\engine"
@@ -628,29 +858,41 @@ FunctionEnd
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecMain} "The engine, the Internet Explorer add-on and the native view. Required."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPdf} "Built-in PDF viewer. Without it PDF files are not shown inside pages (saves about 3 MB)."
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecDev} "Gecko developer tools and the Inspect Element item in the right-click menu (experimental). Without them the tools are removed from the engine."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecDev} "Gecko developer tools and the Inspect Element item in the right-click menu (experimental). They are kept in the engine's browser folder (which the slimming option then leaves alone). Only works if your engine contains them. Without them the tools are removed from the engine."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecMedia} "H.264 and AAC playback libraries. Without them many MP4 videos do not play."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecDict} "English spell-check dictionaries for text fields."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPerf} "Memory cache instead of the slow disk cache, no service workers / WebGL / telemetry / update checks, no slow-script prompts. Recommended for old computers."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecBtn} "Registers the GeckoIE Settings toolbar button. It stays hidden until you add it (View > Toolbars > Customize)."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecKeep} "Keeps everything the installer removes in the engine-removed folder, so restore-engine.bat can put it back. Off by default: it needs extra disk space. To get removed parts back later, run setup again and choose your original Mypal folder."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecSlim} "Moves the updater, crash reporter and Firefox's own browser interface folder to a backup folder. Not needed by GeckoIE."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecSlimX} "Goes further than basic slimming and trades features for speed: the engine no longer contains Firefox Sync, Firefox Accounts, the telemetry start-up service, the add-on manager and update screens, and the automatic hyphenation tables. GeckoIE does not use any of them, so the engine has less to read and register when it starts. Everything is kept in a backup folder; restore-engine.bat puts the original back."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 ; ---------------------------------------------------------------- uninstall
 Function un.onInit
   unCheckIE:
+  StrCpy $R9 0
   FindWindow $0 "IEFrame"
   ${If} $0 != 0
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Please close all Internet Explorer windows, then click Retry." IDRETRY unCheckIE
+    StrCpy $R9 1
+  ${Else}   ; an Internet Explorer process without a window keeps the add-on files in use as well
+    nsExec::Exec '"$SYSDIR\cmd.exe" /c ""$SYSDIR\tasklist.exe" /FI "IMAGENAME eq iexplore.exe" /NH | "$SYSDIR\find.exe" /I "iexplore.exe" >nul"'
+    Pop $0
+    ${If} $0 == 0
+      StrCpy $R9 1
+    ${EndIf}
+  ${EndIf}
+  ${If} $R9 == 1
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Please close all Internet Explorer windows (also ones running in the background), then click Retry." /SD IDCANCEL IDRETRY unCheckIE
     Abort
   ${EndIf}
 FunctionEnd
 
 Section "Uninstall"
+  nsExec::Exec '"$SYSDIR\rundll32.exe" "$INSTDIR\bho\GeckoIEDoc.dll",GieCleanFavorites'
+  Pop $0
   DetailPrint "Removing the native view and the Internet Explorer add-on..."
   nsExec::Exec '"$SYSDIR\regsvr32.exe" /u /s "$INSTDIR\bho\GeckoIEDoc.dll"'
-  Pop $0
-  nsExec::ExecToLog '"$SYSDIR\cmd.exe" /c ""$INSTDIR\bho-src\uninstall-bho.bat" "$INSTDIR""'
   Pop $0
   DeleteRegKey HKLM "${BHO_KEY}"
   DeleteRegKey HKCR "CLSID\${BHO_CLSID}"
@@ -667,6 +909,8 @@ Section "Uninstall"
   Delete "$INSTDIR\shell.html"
   Delete "$INSTDIR\classic-ie.cmd"
   Delete "$INSTDIR\set-ini.bat"
+  Delete "$INSTDIR\setup-log.txt"
+  Delete "$INSTDIR\omni-remove-browser.txt"
   Delete "$INSTDIR\gh-start.flag"
   Delete "$INSTDIR\ieb.ini.tmp"
   Delete "$INSTDIR\geckoie-bare-log.txt"

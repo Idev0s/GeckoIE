@@ -127,7 +127,7 @@ namespace IEBridgeBho
         private string bypassUrl;         // URL IE must render itself (engine unavailable)
         private string currentEngineUrl = "";
         private string pendingTitle;
-        private const string Version = "v0 build 261024.3";
+        private const string Version = "v0.1 Alpha 3 (build 261101.2)";
         private bool docObjActive;        // HostMode=docobj: http(s) is redirected to gie: and the DocObject view hosts the engine
 
         // ---------------------------------------------------------- logging
@@ -142,15 +142,26 @@ namespace IEBridgeBho
             }
         }
 
+        private static int logPid;
+
         public static void Log(string message)
         {
             try
             {
                 lock (logLock)
                 {
-                    File.AppendAllText(Path.Combine(DllDir, "bho-log.txt"),
-                        DateTime.Now.ToString("HH:mm:ss") + " [pid " +
-                        System.Diagnostics.Process.GetCurrentProcess().Id + "] " + message + "\r\n");
+                    if (logPid == 0)   // a Process object per log line used to leak a handle each time
+                    {
+                        using (Process p = Process.GetCurrentProcess()) logPid = p.Id;
+                    }
+                    string path = Path.Combine(DllDir, "bho-log.txt");
+                    FileInfo fi = new FileInfo(path);
+                    if (fi.Exists && fi.Length > 1000000)
+                    {
+                        try { File.Delete(path + ".old"); File.Move(path, path + ".old"); } catch (Exception) { }
+                    }
+                    File.AppendAllText(path,
+                        DateTime.Now.ToString("HH:mm:ss") + " [pid " + logPid + "] " + message + "\r\n");
                 }
             }
             catch (Exception) { }

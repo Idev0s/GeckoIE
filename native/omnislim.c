@@ -11,8 +11,22 @@ static void w16(uint8_t* p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v 
 static void w32(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 typedef struct { uint32_t lho; uint32_t cpos; int keep; } Ent;
 static int cmp(const void* a, const void* b) { uint32_t x = ((const Ent*)a)->lho, y = ((const Ent*)b)->lho; return x < y ? -1 : x > y; }
+static int hasPrefix(const char* file, const char* prefix) {   /* 0 = at least one entry starts with the prefix */
+  FILE* f = fopen(file, "rb"); uint8_t* in; long len, eo = -1; int total, i; uint32_t p; size_t pl = strlen(prefix);
+  if (!f) return 2; fseek(f, 0, SEEK_END); len = ftell(f); fseek(f, 0, SEEK_SET); in = (uint8_t*)malloc(len + 1);
+  if (!in || fread(in, 1, len, f) != (size_t)len) { fclose(f); return 2; } fclose(f);
+  for (long q = len - 22; q >= 0 && q > len - 22 - 65536; q--) if (r32(in + q) == 0x06054b50) { eo = q; break; }
+  if (eo < 0) return 2; total = r16(in + eo + 10); p = r32(in + eo + 16);
+  for (i = 0; i < total; i++) {
+    int nl; if (p + 46 > (uint32_t)len || r32(in + p) != 0x02014b50) return 2; nl = r16(in + p + 28);
+    if ((size_t)nl >= pl && !memcmp(in + p + 46, prefix, pl)) return 0;
+    p += 46 + nl + r16(in + p + 30) + r16(in + p + 32);
+  }
+  return 1;
+}
 int main(int argc, char** argv) {
   FILE* f; uint8_t* in; long len; char pat[256][256]; int np = 0, i;
+  if (argc >= 4 && !strcmp(argv[1], "--has")) return hasPrefix(argv[2], argv[3]);
   if (argc < 4) { fprintf(stderr, "usage: omnislim in.ja out.ja prefixes.txt\n"); return 1; }
   f = fopen(argv[3], "r"); if (!f) { fprintf(stderr, "cannot read %s\n", argv[3]); return 1; }
   while (np < 256 && fgets(pat[np], 256, f)) { char* e = pat[np] + strlen(pat[np]); while (e > pat[np] && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ')) *--e = 0; if (pat[np][0] && pat[np][0] != '#') np++; }
